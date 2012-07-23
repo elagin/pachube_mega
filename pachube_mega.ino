@@ -1,6 +1,7 @@
 // less -f /dev/ttyACM1 > out.txt
 #include <OneWire.h>
 #include <DallasTemperature.h>
+
 #if defined(ARDUINO) && ARDUINO > 18
 #include <SPI.h>
 #endif
@@ -8,6 +9,7 @@
 #include <EthernetDHCP.h>
 #include <EthernetDNS.h>
 #include <ERxPachube.h>
+#include <BMP085.h>
 
 #define ONE_WIRE_BUS 30         // Шина данных датчиков
 #define TEMPERATURE_PRECISION 15 // Точность датчиков
@@ -31,6 +33,9 @@ char bufSerial[20];
 
 char ledScanTime = 13;
 //char ledAlarm    = 40;
+
+BMP085 dps = BMP085();      // Digital Pressure Sensor 
+long Temperature = 0, Pressure = 0, Altitude = 0;
 
 bool isRestart = true;
 
@@ -74,7 +79,7 @@ sensorData sensorsParams[MAX_DS1820_SENSORS] = {
     0x28, 0xB0, 0xDB, 0xC7, 0x02, 0x00, 0x00, 0xC7, "Out", 3, 0,
     0x28, 0x9B, 0xC5, 0xC7, 0x02, 0x00, 0x00, 0x57, "Ter cold", 4, 0,
     0x28, 0xEE, 0xD6, 0xC7, 0x02, 0x00, 0x00, 0x16, "Ter warm", 5, 0,
-    0x28, 0x02, 0xDC, 0xC7, 0x02, 0x00, 0x00, 0xFF, "Battery", 6, 0
+    0x28, 0x02, 0xDC, 0xC7, 0x02, 0x00, 0x00, 0xFF, "Battery", 6, 0,
     0x28, 0xFA, 0xDF, 0xC7, 0x02, 0x00, 0x00, 0x62, "Stepan", 7, 0
 };
 
@@ -124,6 +129,10 @@ void setup()
         }
 
     }
+    
+    dataout.addData(97); // указываем id для Pachube с которыми будем работать
+    dataout.addData(98); // указываем id для Pachube с которыми будем работать
+    dataout.addData(99); // указываем id для Pachube с которыми будем работать    
          dallasSensors.setResolution(12);
     pinMode(ledScanTime, OUTPUT);
     sprintf(buf, "Found %d sensors", sensorCount);
@@ -136,6 +145,8 @@ void setup()
 
     digitalWrite(4, HIGH);
     int a = 0;
+    
+    dps.init(MODE_STANDARD, 100374, false);  // 101850Pa = 1018.50hPa, false = using Pa units
 }
 
 // function to print a device address
@@ -167,9 +178,22 @@ void getSensorData()
         Serial.println(sensorsParams[sensor].temp);*/
 
     }
-        int status = dataout.updatePachube();
-    digitalWrite(ledScanTime, LOW);
-    Serial.println("-= getSensorData end =-");
+    
+  dps.getTemperature(&Temperature);   
+  int pach_temp = Temperature;
+  dataout.updateData(99, pach_temp);  
+  
+  dps.getPressure(&Pressure);
+  float pach_Pressure = Pressure;
+  dataout.updateData(99, pach_Pressure);  
+  
+  dps.getAltitude(&Altitude);
+  float pach_Altitude = Altitude;
+  dataout.updateData(99, pach_Altitude);  
+  
+  int status = dataout.updatePachube();
+  digitalWrite(ledScanTime, LOW);
+  Serial.println("-= getSensorData end =-");
 }
 
 bool compareAddres(DeviceAddress deviceAddress, DeviceAddress deviceAddress2)
